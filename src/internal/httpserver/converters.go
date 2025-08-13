@@ -28,7 +28,7 @@ var taskStatusMapping = map[domain.TaskStatus]string{
 func getStringFromStatusForTask(status domain.TaskStatus) (string, error) {
 	mappedStatus, ok := taskStatusMapping[status]
 	if !ok {
-		return "", fmt.Errorf("invalid task status: %s", status)
+		return "", fmt.Errorf("invalid task status: %w", status)
 	}
 
 	return mappedStatus, nil

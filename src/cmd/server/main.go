@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"log"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -11,9 +12,12 @@ import (
 	"testLo/internal/httpserver"
 	"testLo/internal/repository"
 	"testLo/internal/service"
+	"testLo/pkg/logger/slogpretty"
 	"testLo/pkg/server"
 	"time"
 )
+
+const serverPort = ":8080" // <--- вынес порт в константу
 
 func main() {
 	if err := run(); err != nil {
@@ -23,60 +27,36 @@ func main() {
 }
 
 func run() error {
-	// Контекст с отменой по сигналу
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	// Канал логирования
+	log := setupLogger()
+
 	logCh := make(chan string, 100)
 	go func() {
 		for msg := range logCh {
-			log.Printf("[LOG] %s", msg)
+			log.Info(fmt.Sprintf("[LOG] %v", msg))
 		}
 	}()
 
-	// Репозиторий и сервис
-	taskRepo := repository.NewMemoryTaskRepo()
-	svc := service.NewService(taskRepo)
+	taskRepo := repository.NewMemoryTaskRepo(logCh)
+	svc := service.NewService(taskRepo, logCh)
 
-	// Хендлеры
-	taskHandler := httpserver.NewTaskHandler(*svc)
+	taskHandler := httpserver.NewTaskHandler(*svc, logCh)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/tasks", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			taskHandler.GetTasks(w, r)
-			logCh <- "GET /tasks called"
-		case http.MethodPost:
-			taskHandler.CreateTask(w, r)
-			logCh <- "POST /tasks called"
-		default:
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
-	mux.HandleFunc("/tasks/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			taskHandler.GetTaskByID(w, r)
-			logCh <- "GET /tasks/{id} called"
-		} else {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
+	taskHandler.HandleRoutes(mux, logCh)
 
-	// HTTP сервер
-	srv := server.New(":8080", mux)
+	srv := server.New(serverPort, mux) // используем константу
 
-	// Запуск сервера в отдельной горутине
 	errCh := make(chan error, 1)
 	go func() {
-		slog.Info("server starting", slog.String("addr", ":8080"))
-		if err := srv.Run(); err != nil && err != http.ErrServerClosed {
+		log.Info("server starting", slog.String("addr", serverPort)) // и здесь
+		if err := srv.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 	}()
 
-	// Ожидание завершения
 	select {
 	case <-ctx.Done():
 		slog.Info("shutdown signal received")
@@ -84,13 +64,22 @@ func run() error {
 		return err
 	}
 
-	// Завершение сервера с таймаутом
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		return err
 	}
 
-	close(logCh) // закрываем канал логов
+	close(logCh)
 	return nil
+}
+
+func setupLogger() *slog.Logger {
+	opts := slogpretty.PrettyHandlerOptions{
+		SlogOpts: &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		},
+	}
+	handler := opts.NewPrettyHandler(os.Stdout)
+	return slog.New(handler)
 }

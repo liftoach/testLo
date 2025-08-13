@@ -10,10 +10,19 @@ var (
 
 type Service struct {
 	TaskRepository TaskRepository
+	logCh          chan string
 }
 
-func NewService(taskRepo TaskRepository) *Service {
+func NewService(taskRepo TaskRepository, logCh chan string) *Service {
 	return &Service{
 		TaskRepository: taskRepo,
+		logCh:          logCh,
+	}
+}
+
+func (s *Service) log(msg string) {
+	select {
+	case s.logCh <- "[service] " + msg:
+	default:
 	}
 }

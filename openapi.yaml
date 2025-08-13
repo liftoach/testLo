@@ -1,0 +1,125 @@
+openapi: 3.0.3
+info:
+  title: Task API
+  version: 1.0.0
+  description: API для управления задачами
+
+paths:
+  /tasks:
+    get:
+      summary: Получить список всех задач
+      description: Можно фильтровать задачи по статусу
+      parameters:
+        - name: status
+          in: query
+          description: Фильтр по статусу задачи
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Список задач
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskReadDTO'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            text/plain:
+              schema:
+                type: string
+
+    post:
+      summary: Создать новую задачу
+      description: Создает задачу с заданным названием и статусом
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '200':
+          description: Созданная задача
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskReadDTO'
+        '400':
+          description: Некорректный запрос
+          content:
+            text/plain:
+              schema:
+                type: string
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /tasks/{id}:
+    get:
+      summary: Получить задачу по ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID задачи
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Задача
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskReadDTO'
+        '400':
+          description: Некорректный ID
+          content:
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: Задача не найдена
+          content:
+            text/plain:
+              schema:
+                type: string
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  schemas:
+    TaskReadDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        status:
+          type: string
+      required:
+        - id
+        - title
+        - status
+
+    CreateTaskRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        status:
+          type: string
+      required:
+        - title
+        - status

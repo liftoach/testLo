@@ -18,18 +18,3 @@ func getStatusFromStringForTask(status string) (domain.TaskStatus, error) {
 	}
 	return mappedStatus, nil
 }
-
-var taskStatusMapping = map[domain.TaskStatus]string{
-	domain.TaskStatusDone:       "TaskDone",
-	domain.TaskStatusInProgress: "TaskInProgress",
-	domain.TaskStatusTodo:       "TaskToDo",
-}
-
-func getStringFromStatusForTask(status domain.TaskStatus) (string, error) {
-	mappedStatus, ok := taskStatusMapping[status]
-	if !ok {
-		return "", fmt.Errorf("invalid task status: %s", status)
-	}
-
-	return mappedStatus, nil
-}
